@@ -46,42 +46,33 @@ public class EntrepriseService {
 	    private final String range = "Entreprises!A2:B";
 
 
-	    /** Load credentials, handle expired refresh tokens */
-	    private static Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
-	        // Load client secrets
-	        InputStream in = AuthService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
-	        if (in == null) {
-	            throw new FileNotFoundException("Resource not found: " + CREDENTIALS_FILE_PATH);
-	        }
-	        GoogleClientSecrets clientSecrets =
-	                GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
+	  private static Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
+    // Load client secrets
+    InputStream in = AuthService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
+    if (in == null) {
+        throw new FileNotFoundException("Resource not found: " + CREDENTIALS_FILE_PATH);
+    }
+    GoogleClientSecrets clientSecrets =
+            GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
 
-	        // Build flow and trigger user authorization request
-	        GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-	                HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-	                .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
-	                .setAccessType("offline")      // must get a refresh token
-	                .setApprovalPrompt("force")    // forces Google to issue new refresh token
-	                .build();
+    // Build the flow (without LocalServerReceiver)
+    GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
+            HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
+            .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
+            .setAccessType("offline")      // must get a refresh token
+            .setApprovalPrompt("force")    // forces Google to issue new refresh token
+            .build();
 
-	        LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8888).build();
-	        try {
-	            return new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");
-	        } catch (TokenResponseException e) {
-	            if (e.getDetails() != null && "invalid_grant".equals(e.getDetails().getError())) {
-	                // Refresh token invalid → clear stored tokens
-	                File tokensDir = new File(TOKENS_DIRECTORY_PATH);
-	                if (tokensDir.exists()) {
-	                    for (File f : tokensDir.listFiles()) {
-	                        f.delete();
-	                    }
-	                }
-	                throw new RuntimeException("Google token expired/revoked. Please re-authenticate.", e);
-	            }
-	            throw e;
-	        }
-	    }
+    // Production → Spring Security handles redirect URI via HTTPS
+    // You just return the Credential if already stored
+    Credential credential = flow.loadCredential("user");
+    if (credential != null && credential.getAccessToken() != null) {
+        return credential;
+    }
 
+    throw new RuntimeException(
+            "Credential not found. In production, OAuth2 flow should be triggered via Spring Security OAuth2 endpoint.");
+}
 	    /** Example: authenticate and get data from Sheet */
 	    public List<Entreprise> getData() throws IOException, GeneralSecurityException {
 	        final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();

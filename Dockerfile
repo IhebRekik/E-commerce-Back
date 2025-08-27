@@ -1,19 +1,16 @@
 # Stage 1: Build the JAR using Maven
 FROM maven:3.9.2-eclipse-temurin-21 AS build
 
-# Set working directory inside container
 WORKDIR /app
 
-# Copy Maven configuration first for caching
+# Copy Maven files first for caching
 COPY pom.xml .
-
-# Copy source code
 COPY src ./src
 
-# Build the Spring Boot JAR (skip tests to speed up)
+# Build the Spring Boot JAR
 RUN mvn clean package -DskipTests
 
-# Stage 2: Create lightweight runtime image
+# Stage 2: Runtime image
 FROM eclipse-temurin:21-jdk
 
 WORKDIR /app

@@ -32,7 +32,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-            docker build -t ghcr.io/ihebrekik/e-commerce-backend:latest -f backend/Dockerfile backend/
+            docker build -t ghcr.io/ihebrekik/e-commerce-backend:latest .
 
       - name: Push Docker image
         run: |

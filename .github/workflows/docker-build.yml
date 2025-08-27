@@ -31,8 +31,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Docker image
-        run:
-            docker build -t ghcr.io/ihebrekik/e-commerce-backend:latest .
+        run: |
+            docker build -t ghcr.io/ihebrekik/e-commerce-backend:latest -f backend/Dockerfile backend/
 
       - name: Push Docker image
         run: |

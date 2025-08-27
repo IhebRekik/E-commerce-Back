@@ -10,7 +10,8 @@ import com.google.auth.http.HttpCredentialsAdapter;
 import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.serveur.backend.Entity.Chart;
 import org.springframework.stereotype.Service;
-
+import java.nio.charset.StandardCharsets;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;

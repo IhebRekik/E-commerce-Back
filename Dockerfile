@@ -1,9 +1,9 @@
 # Stage 1: Build the JAR using Maven
-FROM maven:3.9.2-eclipse-temurin-21 AS build
+FROM maven:3.9.2-eclipse-temurin-21-jdk AS build
 
 WORKDIR /app
 
-# Copy Maven files first for caching
+# Copy Maven files for caching
 COPY pom.xml .
 COPY src ./src
 

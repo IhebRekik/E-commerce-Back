@@ -1,105 +1,84 @@
 package com.serveur.backend.services;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.security.GeneralSecurityException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
-import org.springframework.stereotype.Service;
-
-import com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.auth.oauth2.TokenResponseException;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
-import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
-import com.google.api.client.json.gson.GsonFactory;
-import com.google.api.client.util.store.FileDataStoreFactory;
+import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.ValueRange;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.serveur.backend.Entity.Chart;
-import com.serveur.backend.Entity.Historique;
+import org.springframework.stereotype.Service;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.GeneralSecurityException;
+import java.util.Collections;
+import java.util.List;
 
 @Service
 public class ChartService {
-	 private static final String APPLICATION_NAME = "Google Sheets API Java Backend";
-	    private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
-	    private static final String TOKENS_DIRECTORY_PATH = "tokens";
 
-	    private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
-	    private static final String CREDENTIALS_FILE_PATH = "/credentials.json";
+    private static final String APPLICATION_NAME = "Google Sheets API Java Backend";
+    private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
-	    private final String spreadsheetId = "1u4gvDZ5Jr8uBjfZismap_egJV4r0bpHkG0i8Ydar2vc";
-	    private final String range = "Stat!A2:G";
+    // 👇 replace with your spreadsheet ID & range
+    private static final String SPREADSHEET_ID = "1u4gvDZ5Jr8uBjfZismap_egJV4r0bpHkG0i8Ydar2vc";
+    private static final String RANGE = "Stat!A2:G";  
 
+    /**
+     * Build an authorized Sheets service using service account credentials.
+     */
+    private Sheets getSheetsService() throws IOException, GeneralSecurityException {
+        // Load service account key from resources
+        InputStream in = getClass().getResourceAsStream("/service_account.json");
+        if (in == null) {
+            throw new IOException("Resource not found: service_account.json");
+        }
 
-	    /** Load credentials, handle expired refresh tokens */
-	  private static Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
-    // Load client secrets
-    InputStream in = AuthService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
-    if (in == null) {
-        throw new FileNotFoundException("Resource not found: " + CREDENTIALS_FILE_PATH);
-    }
-    GoogleClientSecrets clientSecrets =
-            GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
+        ServiceAccountCredentials credentials = (ServiceAccountCredentials) ServiceAccountCredentials
+                .fromStream(in)
+                .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS));
 
-    // Build the flow (without LocalServerReceiver)
-    GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-            HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-            .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
-            .setAccessType("offline")      // must get a refresh token
-            .setApprovalPrompt("force")    // forces Google to issue new refresh token
-            .build();
-
-    // Production → Spring Security handles redirect URI via HTTPS
-    // You just return the Credential if already stored
-    Credential credential = flow.loadCredential("user");
-    if (credential != null && credential.getAccessToken() != null) {
-        return credential;
+        return new Sheets.Builder(
+                GoogleNetHttpTransport.newTrustedTransport(),
+                JSON_FACTORY,
+                new HttpCredentialsAdapter(credentials))
+                .setApplicationName(APPLICATION_NAME)
+                .build();
     }
 
-    throw new RuntimeException(
-            "Credential not found. In production, OAuth2 flow should be triggered via Spring Security OAuth2 endpoint.");
-}
-	    
-	    public Chart getData() throws IOException, GeneralSecurityException {
-	        final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
+    /**
+     * Fetch data from Google Sheets and map it into Chart entity
+     */
+    public Chart getData() throws IOException, GeneralSecurityException {
+        Sheets service = getSheetsService();
 
-	        Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-	                .setApplicationName(APPLICATION_NAME)
-	                .build();
+        ValueRange response = service.spreadsheets().values()
+                .get(SPREADSHEET_ID, RANGE)
+                .execute();
 
-	        ValueRange response = service.spreadsheets().values()
-	                .get(spreadsheetId, range)
-	                .execute();
+        Chart chart = new Chart();
+        List<List<Object>> values = response.getValues();
 
-	        Chart c = new Chart();
-	        List<List<Object>> values = response.getValues();
-	        
-	        if(values != null) {
-	        	
-	        	for(List<Object> row : values) {
-	        		
-	        		c.setTotal(Long.parseLong(row.get(0).toString()));
-	        		c.setConf(Long.parseLong(row.get(1).toString()));
-	        		c.setReje(Long.parseLong(row.get(2).toString()));
-	        		c.setAutre(Long.parseLong(row.get(0).toString())-(Long.parseLong(row.get(2).toString())+Long.parseLong(row.get(1).toString())));
-	        		c.setNews(Long.parseLong(row.get(3).toString()));
-	        		c.setDup(Long.parseLong(row.get(4).toString()));
-	        		c.setBad(Long.parseLong(row.get(5).toString()));
-	        		c.setGood(Long.parseLong(row.get(6).toString()));
-	        	}
-	        }
-	        return c;
-	    }
+        if (values != null && !values.isEmpty()) {
+            for (List<Object> row : values) {
+                // Assuming row has at least 7 columns
+                chart.setTotal(Long.parseLong(row.get(0).toString()));
+                chart.setConf(Long.parseLong(row.get(1).toString()));
+                chart.setReje(Long.parseLong(row.get(2).toString()));
+                chart.setAutre(
+                        Long.parseLong(row.get(0).toString())
+                                - (Long.parseLong(row.get(1).toString())
+                                + Long.parseLong(row.get(2).toString())));
+                chart.setNews(Long.parseLong(row.get(3).toString()));
+                chart.setDup(Long.parseLong(row.get(4).toString()));
+                chart.setBad(Long.parseLong(row.get(5).toString()));
+                chart.setGood(Long.parseLong(row.get(6).toString()));
+            }
+        }
 
+        return chart;
+    }
 }

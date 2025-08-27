@@ -20,8 +20,7 @@ public class BackendApplication {
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-       // config.addAllowedOriginPattern("https://classy-brigadeiros-f5e54e.netlify.app"); // frontend URL
-        config.addAllowedOriginPattern("http://localhost:5173");
+        config.addAllowedOriginPattern("https://classy-brigadeiros-f5e54e.netlify.app"); // frontend URL
         config.setAllowedHeaders(Arrays.asList("Origin", "Content-Type", "Accept", "Authorization"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
 

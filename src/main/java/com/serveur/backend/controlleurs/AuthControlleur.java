@@ -31,8 +31,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 
 @RestController
-//@CrossOrigin(origins = "https://classy-brigadeiros-f5e54e.netlify.app")
-@CrossOrigin(origins = "http://http://localhost:5173")
+@CrossOrigin(origins = "https://classy-brigadeiros-f5e54e.netlify.app")
 
 public class AuthControlleur {
 

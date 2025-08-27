@@ -31,6 +31,8 @@ import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.AppendValuesResponse;
 import com.google.api.services.sheets.v4.model.ValueRange;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.serveur.backend.Config.JwtUtil;
 import com.serveur.backend.Entity.Entreprise;
 import com.serveur.backend.Entity.Historique;
@@ -57,41 +59,29 @@ public class HistoriqueService {
 
 
 	    /** Load credentials, handle expired refresh tokens */
-	  private static Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
-    // Load client secrets
-    InputStream in = AuthService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
-    if (in == null) {
-        throw new FileNotFoundException("Resource not found: " + CREDENTIALS_FILE_PATH);
-    }
-    GoogleClientSecrets clientSecrets =
-            GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
+	    private Sheets getSheetsService() throws IOException, GeneralSecurityException {
+	        // Load service account key from resources
+	        InputStream in = getClass().getResourceAsStream("/service_account.json");
+	        if (in == null) {
+	            throw new IOException("Resource not found: service_account.json");
+	        }
 
-    // Build the flow (without LocalServerReceiver)
-    GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-            HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-            .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
-            .setAccessType("offline")      // must get a refresh token
-            .setApprovalPrompt("force")    // forces Google to issue new refresh token
-            .build();
+	        ServiceAccountCredentials credentials = (ServiceAccountCredentials) ServiceAccountCredentials
+	                .fromStream(in)
+	                .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS));
 
-    // Production → Spring Security handles redirect URI via HTTPS
-    // You just return the Credential if already stored
-    Credential credential = flow.loadCredential("user");
-    if (credential != null && credential.getAccessToken() != null) {
-        return credential;
-    }
-
-    throw new RuntimeException(
-            "Credential not found. In production, OAuth2 flow should be triggered via Spring Security OAuth2 endpoint.");
-}
-
+	        return new Sheets.Builder(
+	                GoogleNetHttpTransport.newTrustedTransport(),
+	                JSON_FACTORY,
+	                new HttpCredentialsAdapter(credentials))
+	                .setApplicationName(APPLICATION_NAME)
+	                .build();
+	    }
 	    /** Example: authenticate and get data from Sheet */
 	    public List<Historique> getData(String entreprise) throws IOException, GeneralSecurityException {
 	        final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
 
-	        Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-	                .setApplicationName(APPLICATION_NAME)
-	                .build();
+	        Sheets service = getSheetsService();
 
 	        ValueRange response = service.spreadsheets().values()
 	                .get(spreadsheetId, range)
@@ -130,9 +120,7 @@ public class HistoriqueService {
 	    public void addRowToSheet(List<Historique> his) throws IOException, GeneralSecurityException {
 	        final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
 
-	        Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-	                .setApplicationName(APPLICATION_NAME)
-	                .build();
+	        Sheets service = getSheetsService();
 
 	        List<List<Object>> rows = new ArrayList<>();
 	        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy"); // format date

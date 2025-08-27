@@ -31,6 +31,8 @@ import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
 import com.google.api.services.sheets.v4.model.ClearValuesRequest;
 import com.google.api.services.sheets.v4.model.ValueRange;
+import com.google.auth.http.HttpCredentialsAdapter;
+import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.serveur.backend.Entity.Commande;
 import com.serveur.backend.Entity.Historique;
 import com.serveur.backend.Entity.ToDelivered;
@@ -51,33 +53,24 @@ public class Command_Services {
 	private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
 	private static final String CREDENTIALS_FILE_PATH = "/credentials.json";
 
-	private static Credential getCredentials(final NetHttpTransport HTTP_TRANSPORT) throws IOException {
-    // Load client secrets
-    InputStream in = AuthService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
-    if (in == null) {
-        throw new FileNotFoundException("Resource not found: " + CREDENTIALS_FILE_PATH);
-    }
-    GoogleClientSecrets clientSecrets =
-            GoogleClientSecrets.load(JSON_FACTORY, new InputStreamReader(in));
+	 private Sheets getSheetsService() throws IOException, GeneralSecurityException {
+	        // Load service account key from resources
+	        InputStream in = getClass().getResourceAsStream("/service_account.json");
+	        if (in == null) {
+	            throw new IOException("Resource not found: service_account.json");
+	        }
 
-    // Build the flow (without LocalServerReceiver)
-    GoogleAuthorizationCodeFlow flow = new GoogleAuthorizationCodeFlow.Builder(
-            HTTP_TRANSPORT, JSON_FACTORY, clientSecrets, SCOPES)
-            .setDataStoreFactory(new FileDataStoreFactory(new java.io.File(TOKENS_DIRECTORY_PATH)))
-            .setAccessType("offline")      // must get a refresh token
-            .setApprovalPrompt("force")    // forces Google to issue new refresh token
-            .build();
+	        ServiceAccountCredentials credentials = (ServiceAccountCredentials) ServiceAccountCredentials
+	                .fromStream(in)
+	                .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS));
 
-    // Production → Spring Security handles redirect URI via HTTPS
-    // You just return the Credential if already stored
-    Credential credential = flow.loadCredential("user");
-    if (credential != null && credential.getAccessToken() != null) {
-        return credential;
-    }
-
-    throw new RuntimeException(
-            "Credential not found. In production, OAuth2 flow should be triggered via Spring Security OAuth2 endpoint.");
-}
+	        return new Sheets.Builder(
+	                GoogleNetHttpTransport.newTrustedTransport(),
+	                JSON_FACTORY,
+	                new HttpCredentialsAdapter(credentials))
+	                .setApplicationName(APPLICATION_NAME)
+	                .build();
+	    }
 	private final String spreadsheetId = "1u4gvDZ5Jr8uBjfZismap_egJV4r0bpHkG0i8Ydar2vc";
 	private final String confermation = "Confirmation!A2:J";
 	private final String historique = "Historique!A2:I";
@@ -89,8 +82,7 @@ public class Command_Services {
 
 		final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
 
-		Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-				.setApplicationName(APPLICATION_NAME).build();
+		Sheets service = getSheetsService();
 		ValueRange response = service.spreadsheets().values().get(spreadsheetId, confermation).execute();
 		List<List<Object>> values = response.getValues();
 		List<Commande> list = new ArrayList<>();
@@ -118,9 +110,7 @@ public class Command_Services {
 
 	public void updateCommandes(List<Commande> changedCommandes,String id) throws Exception {
 	    final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
-	    Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-	            .setApplicationName(APPLICATION_NAME)
-	            .build();
+	    Sheets service = getSheetsService();
 	    
 	    // Column mapping
 	    final int COL_NOM = 0;
@@ -182,8 +172,7 @@ public class Command_Services {
 
 		final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
 
-		Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-				.setApplicationName(APPLICATION_NAME).build();
+		Sheets service = getSheetsService();
 		ValueRange response = service.spreadsheets().values().get(spreadsheetId, historique).execute();
 		List<List<Object>> values = response.getValues();
 		List<Commande> list = new ArrayList<>();
@@ -210,10 +199,7 @@ public class Command_Services {
 		
 		 final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
 		    
-		    Sheets service =
-		        new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-		            .setApplicationName(APPLICATION_NAME)
-		            .build();
+		    Sheets service =getSheetsService();
 		    ValueRange response = service.spreadsheets().values()
 		        .get(spreadsheetId, toDelivered)
 		        .execute();
@@ -252,9 +238,7 @@ public class Command_Services {
 	public void clearToDelivered() throws GeneralSecurityException, IOException {
 	    final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
 
-	    Sheets service = new Sheets.Builder(HTTP_TRANSPORT, JSON_FACTORY, getCredentials(HTTP_TRANSPORT))
-	            .setApplicationName(APPLICATION_NAME)
-	            .build();
+	    Sheets service = getSheetsService();
 
 	    // Efface toutes les valeurs de la plage "toDelivered"
 	    ClearValuesRequest requestBody = new ClearValuesRequest();

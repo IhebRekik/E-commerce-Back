@@ -55,14 +55,17 @@ public class AuthService {
     /** Load credentials, handle expired refresh tokens */
     private Sheets getSheetsService() throws IOException, GeneralSecurityException {
         // Load service account key from resources
-        InputStream in = getClass().getResourceAsStream("/service_account.json");
-        if (in == null) {
-            throw new IOException("Resource not found: service_account.json");
-        }
+ String json = System.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
+if (json == null || json.isEmpty()) {
+    throw new IOException("Environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON not set");
+}
 
-        ServiceAccountCredentials credentials = (ServiceAccountCredentials) ServiceAccountCredentials
-                .fromStream(in)
-                .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS));
+// Convert JSON string to InputStream
+InputStream in = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
+
+ServiceAccountCredentials credentials = (ServiceAccountCredentials) ServiceAccountCredentials
+        .fromStream(in)
+        .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS));
 
         return new Sheets.Builder(
                 GoogleNetHttpTransport.newTrustedTransport(),

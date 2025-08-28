@@ -11,8 +11,9 @@ import com.google.auth.oauth2.ServiceAccountCredentials;
 import com.serveur.backend.Entity.Chart;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Collections;
 import java.util.List;
@@ -23,19 +24,19 @@ public class ChartService {
     private static final String APPLICATION_NAME = "Google Sheets API Java Backend";
     private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
 
-    // 👇 replace with your spreadsheet ID & range
     private static final String SPREADSHEET_ID = "1u4gvDZ5Jr8uBjfZismap_egJV4r0bpHkG0i8Ydar2vc";
-    private static final String RANGE = "Stat!A2:G";  
+    private static final String RANGE = "Stat!A2:G";
 
     /**
-     * Build an authorized Sheets service using service account credentials.
+     * Build an authorized Sheets service using service account credentials from environment variable.
      */
     private Sheets getSheetsService() throws IOException, GeneralSecurityException {
-        // Load service account key from resources
-        InputStream in = getClass().getResourceAsStream("/service_account.json");
-        if (in == null) {
-            throw new IOException("Resource not found: service_account.json");
+        String json = System.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
+        if (json == null || json.isEmpty()) {
+            throw new IOException("Environment variable GOOGLE_APPLICATION_CREDENTIALS_JSON not set");
         }
+
+        ByteArrayInputStream in = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
 
         ServiceAccountCredentials credentials = (ServiceAccountCredentials) ServiceAccountCredentials
                 .fromStream(in)
@@ -64,7 +65,6 @@ public class ChartService {
 
         if (values != null && !values.isEmpty()) {
             for (List<Object> row : values) {
-                // Assuming row has at least 7 columns
                 chart.setTotal(Long.parseLong(row.get(0).toString()));
                 chart.setConf(Long.parseLong(row.get(1).toString()));
                 chart.setReje(Long.parseLong(row.get(2).toString()));

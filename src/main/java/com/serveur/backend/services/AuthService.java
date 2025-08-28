@@ -26,13 +26,13 @@ public class AuthService {
 
     private static final String APPLICATION_NAME = "Google Sheets API Java Backend";
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
+    private static final List<String> SCOPES = Collections.singletonList(SheetsScopes.SPREADSHEETS);
 
     private final String spreadsheetId = "1u4gvDZ5Jr8uBjfZismap_egJV4r0bpHkG0i8Ydar2vc";
     private final String range = "Account!A2:J";
 
     private final JwtUtil jwtUtil;
 
-    /** Load credentials from environment variable */
     private Sheets getSheetsService() throws IOException, GeneralSecurityException {
         String json = System.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
         if (json == null || json.isEmpty()) {
@@ -53,13 +53,9 @@ public class AuthService {
                 .build();
     }
 
-    /** Authenticate and get data from Sheet */
     public Map<String, String> getData(String email, String motdepass) throws IOException, GeneralSecurityException {
         Sheets service = getSheetsService();
-
-        ValueRange response = service.spreadsheets().values()
-                .get(spreadsheetId, range)
-                .execute();
+        ValueRange response = service.spreadsheets().values().get(spreadsheetId, range).execute();
 
         Map<String, String> result = new HashMap<>();
         List<List<Object>> values = response.getValues();
@@ -78,41 +74,36 @@ public class AuthService {
                 result.put("userName", row.get(2).toString());
                 result.put("message", "ok");
 
-                // mark user online in sheet
-                row.set(5, "online");
+                row.set(5, "online");  // mark user online
                 ValueRange body = new ValueRange().setValues(values);
                 service.spreadsheets().values().update(spreadsheetId, range, body)
-                        .setValueInputOption("RAW")
-                        .execute();
+                        .setValueInputOption("RAW").execute();
 
                 return result;
             }
         }
-
         result.put("message", "Nom d'utilisateur ou mot de passe incorrect");
         return result;
     }
 
-    /** Add row to sheet */
     public void addRowToSheet(List<Object> rowData) throws IOException, GeneralSecurityException {
         Sheets service = getSheetsService();
         ValueRange body = new ValueRange().setValues(Collections.singletonList(rowData));
-        service.spreadsheets().values()
+        AppendValuesResponse result = service.spreadsheets().values()
                 .append(spreadsheetId, range, body)
                 .setValueInputOption("RAW")
                 .execute();
     }
 
-    /** Get users by entreprise */
     public List<Users> getUsers(String entreprise) throws GeneralSecurityException, IOException {
         Sheets service = getSheetsService();
         ValueRange response = service.spreadsheets().values().get(spreadsheetId, range).execute();
         List<List<Object>> values = response.getValues();
         List<Users> list = new ArrayList<>();
 
-        if (values != null) {
+        if (values != null && !values.isEmpty()) {
             for (List<Object> row : values) {
-                if (row.size() >= 9 && row.get(7).toString().equals(entreprise)) {
+                if (row.size() >= 6 && row.get(7).toString().equals(entreprise)) {
                     Users u = new Users(
                             row.get(0).toString(),
                             row.get(1).toString(),
@@ -129,14 +120,13 @@ public class AuthService {
         return list;
     }
 
-    /** List all users */
     public List<Users> getUsers() throws GeneralSecurityException, IOException {
         Sheets service = getSheetsService();
         ValueRange response = service.spreadsheets().values().get(spreadsheetId, range).execute();
         List<List<Object>> values = response.getValues();
         List<Users> list = new ArrayList<>();
 
-        if (values != null) {
+        if (values != null && !values.isEmpty()) {
             for (List<Object> row : values) {
                 if (row.size() >= 6) {
                     Users u = new Users(
@@ -153,30 +143,26 @@ public class AuthService {
         return list;
     }
 
-    /** Mark user offline */
     public void setOffline(String code) throws IOException, GeneralSecurityException {
         setStatus(code, "offline");
     }
 
-    /** Mark user online */
     public void setOnline(String code) throws IOException, GeneralSecurityException {
         setStatus(code, "online");
     }
 
-    /** Update user status in sheet */
     private void setStatus(String code, String status) throws IOException, GeneralSecurityException {
         Sheets service = getSheetsService();
         ValueRange response = service.spreadsheets().values().get(spreadsheetId, range).execute();
         List<List<Object>> values = response.getValues();
-        if (values != null) {
+        if (values != null && !values.isEmpty()) {
             String id = jwtUtil.getUsernameFromToken(code);
             for (List<Object> row : values) {
-                if (row.size() > 8 && row.get(8).equals(id)) {
+                if (row.size() > 6 && row.get(8).equals(id)) {
                     row.set(5, status);
                     ValueRange body = new ValueRange().setValues(values);
                     service.spreadsheets().values().update(spreadsheetId, range, body)
-                            .setValueInputOption("RAW")
-                            .execute();
+                            .setValueInputOption("RAW").execute();
                     break;
                 }
             }

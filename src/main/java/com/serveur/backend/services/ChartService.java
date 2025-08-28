@@ -23,13 +23,9 @@ public class ChartService {
 
     private static final String APPLICATION_NAME = "Google Sheets API Java Backend";
     private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
-
     private static final String SPREADSHEET_ID = "1u4gvDZ5Jr8uBjfZismap_egJV4r0bpHkG0i8Ydar2vc";
     private static final String RANGE = "Stat!A2:G";
 
-    /**
-     * Build an authorized Sheets service using service account credentials from environment variable.
-     */
     private Sheets getSheetsService() throws IOException, GeneralSecurityException {
         String json = System.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON");
         if (json == null || json.isEmpty()) {
@@ -37,7 +33,6 @@ public class ChartService {
         }
 
         ByteArrayInputStream in = new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8));
-
         ServiceAccountCredentials credentials = (ServiceAccountCredentials) ServiceAccountCredentials
                 .fromStream(in)
                 .createScoped(Collections.singleton(SheetsScopes.SPREADSHEETS));
@@ -50,15 +45,9 @@ public class ChartService {
                 .build();
     }
 
-    /**
-     * Fetch data from Google Sheets and map it into Chart entity
-     */
     public Chart getData() throws IOException, GeneralSecurityException {
         Sheets service = getSheetsService();
-
-        ValueRange response = service.spreadsheets().values()
-                .get(SPREADSHEET_ID, RANGE)
-                .execute();
+        ValueRange response = service.spreadsheets().values().get(SPREADSHEET_ID, RANGE).execute();
 
         Chart chart = new Chart();
         List<List<Object>> values = response.getValues();
@@ -68,17 +57,13 @@ public class ChartService {
                 chart.setTotal(Long.parseLong(row.get(0).toString()));
                 chart.setConf(Long.parseLong(row.get(1).toString()));
                 chart.setReje(Long.parseLong(row.get(2).toString()));
-                chart.setAutre(
-                        Long.parseLong(row.get(0).toString())
-                                - (Long.parseLong(row.get(1).toString())
-                                + Long.parseLong(row.get(2).toString())));
+                chart.setAutre(Long.parseLong(row.get(0).toString()) - (Long.parseLong(row.get(1).toString()) + Long.parseLong(row.get(2).toString())));
                 chart.setNews(Long.parseLong(row.get(3).toString()));
                 chart.setDup(Long.parseLong(row.get(4).toString()));
                 chart.setBad(Long.parseLong(row.get(5).toString()));
                 chart.setGood(Long.parseLong(row.get(6).toString()));
             }
         }
-
         return chart;
     }
 }

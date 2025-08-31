@@ -85,54 +85,63 @@ public class Command_Services {
         }
         return list;
     }
+public void updateCommandes(List<Commande> changedCommandes, String userId) throws Exception {
+    Sheets service = getSheetsService();
 
-    public void updateCommandes(List<Commande> changedCommandes, String userId) throws Exception {
-        Sheets service = getSheetsService();
+    // Column mapping (index dans Google Sheet)
+    final int COL_NOM = 0, COL_TELEPHONE = 1, COL_ADDRESS = 2, COL_PRODUIT = 3,
+              COL_QTIT = 4, COL_PRIX = 5, COL_DATE = 6, COL_ID = 7, COL_STATUTS = 8;
 
-        // Column mapping
-        final int COL_NOM = 0, COL_TELEPHONE = 1, COL_ADDRESS = 2, COL_PRODUIT = 3, 
-                  COL_QTIT = 4, COL_PRIX = 5, COL_DATE = 6, COL_ID = 7, COL_STATUTS = 8;
+    // ✅ Stocker les Commandes entières modifiées (pas seulement le statut)
+    Map<String, Commande> changedMap = changedCommandes.stream()
+            .collect(Collectors.toMap(Commande::getId, c -> c));
 
-        Map<String, String> changedMap = changedCommandes.stream()
-                .collect(Collectors.toMap(Commande::getId, Commande::getStatuts));
+    List<Commande> allCommandes = getCommandeToConfermed();
+    List<List<Object>> values = new ArrayList<>();
+    DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    List<Historique> h = new ArrayList<>();
 
-        List<Commande> allCommandes = getCommandeToConfermed();
-        List<List<Object>> values = new ArrayList<>();
-        DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-        List<Historique> h = new ArrayList<>();
+    for (Commande c : allCommandes) {
+        // Vérifier si cette commande a été modifiée
+        Commande changed = changedMap.getOrDefault(c.getId(), c);
 
-        for (Commande c : allCommandes) {
-            List<Object> row = new ArrayList<>(Collections.nCopies(9, ""));
-            row.set(COL_NOM, c.getNomPrenom());
-            row.set(COL_TELEPHONE, c.getTelephone());
-            row.set(COL_ADDRESS, c.getAddress());
-            row.set(COL_PRODUIT, c.getProduit());
-            row.set(COL_QTIT, c.getQtit());
-            row.set(COL_PRIX, c.getPrix());
-            row.set(COL_DATE, c.getDate().format(outputFormatter));
-            row.set(COL_ID, c.getId());
-            row.set(COL_STATUTS, changedMap.getOrDefault(c.getId(), c.getStatuts()));
+        // Construire la ligne Google Sheet
+        List<Object> row = new ArrayList<>(Collections.nCopies(9, ""));
+        row.set(COL_NOM, changed.getNomPrenom());
+        row.set(COL_TELEPHONE, changed.getTelephone());
+        row.set(COL_ADDRESS, changed.getAddress());
+        row.set(COL_PRODUIT, changed.getProduit());
+        row.set(COL_QTIT, changed.getQtit());
+        row.set(COL_PRIX, changed.getPrix());
+        row.set(COL_DATE, changed.getDate().format(outputFormatter));
+        row.set(COL_ID, changed.getId());
+        row.set(COL_STATUTS, changed.getStatuts());
 
-            if (changedMap.containsKey(c.getId())) {
-                String newStatus = changedMap.get(c.getId());
-                if ("confirmed".equals(newStatus) || "rejected".equals(newStatus)) {
-                    Historique his = new Historique();
-                    his.setUser(userId);
-                    his.setActivity(newStatus);
-                    his.setDate(LocalDate.now());
-                    h.add(his);
-                }
+        // ✅ Ajout dans l’historique si le statut change
+        if (changedMap.containsKey(c.getId())) {
+            String newStatus = changed.getStatuts();
+            if ("confirmed".equals(newStatus) || "rejected".equals(newStatus)) {
+                Historique his = new Historique();
+                his.setUser(userId);
+                his.setActivity(newStatus);
+                his.setDate(LocalDate.now());
+                h.add(his);
             }
-            values.add(row);
         }
 
-        historiqueService.addRowToSheet(h);
-
-        ValueRange body = new ValueRange().setValues(values);
-        service.spreadsheets().values().update(spreadsheetId, confermation, body)
-                .setValueInputOption("RAW")
-                .execute();
+        values.add(row);
     }
+
+    // ✅ Sauvegarde dans l’historique
+    historiqueService.addRowToSheet(h);
+
+    // ✅ Mise à jour dans Google Sheets
+    ValueRange body = new ValueRange().setValues(values);
+    service.spreadsheets().values().update(spreadsheetId, confermation, body)
+            .setValueInputOption("RAW")
+            .execute();
+}
+
 
     public List<Commande> getCommandeHistorique() throws GeneralSecurityException, IOException {
         Sheets service = getSheetsService();
